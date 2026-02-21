@@ -20,3 +20,23 @@ export const userRegisterValidator = () => {
     body("fullName").optional().trim(),
   ];
 };
+
+export const userLoginValidator = () => {
+  return [
+    body("username")
+      .trim()
+      .notEmpty()
+      .withMessage("Username is required")
+      .toLowerCase()
+      .withMessage("Username should be in lowercase")
+      .isLength({ min: 3, max: 10 })
+      .withMessage("length should be minimun of 3 and maximum of 10"),
+    body("email")
+      .trim()
+      .notEmpty()
+      .withMessage("Email is reuired")
+      .isEmail()
+      .withMessage("Invalid email"),
+    body("password").trim().notEmpty().withMessage("Password is required"),
+  ];
+};
