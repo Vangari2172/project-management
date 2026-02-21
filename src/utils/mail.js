@@ -1,7 +1,7 @@
 import Mailgen from "mailgen";
 import nodemailer from "nodemailer";
 
-const sendEmail = async function (options) {
+const sendEmail = async (options) => {
   const mailGenerator = new Mailgen({
     theme: "default",
     product: {
@@ -11,6 +11,7 @@ const sendEmail = async function (options) {
   });
 
   const emailTextual = mailGenerator.generatePlaintext(options.mailgenContent);
+
   const emailHtml = mailGenerator.generate(options.mailgenContent);
 
   const transporter = nodemailer.createTransport({
@@ -33,6 +34,9 @@ const sendEmail = async function (options) {
   try {
     await transporter.sendMail(mail);
   } catch (error) {
+    console.error(
+      "Email service failed siliently. Make sure that you have provided your MAILTRAP credentials in the .env file"
+    );
     console.error("Error: ", error);
   }
 };
@@ -78,7 +82,7 @@ const forgotPasswordMailgenContent = (username, passwordResetUrl) => {
 };
 
 export {
-  sendEmail,
   emailVerificationMailgenContent,
   forgotPasswordMailgenContent,
+  sendEmail,
 };

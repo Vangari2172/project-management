@@ -24,22 +24,20 @@ const generateAccessAndRefreshToken = async (userId) => {
 };
 
 const registerUser = asyncHandler(async (req, res) => {
-  const { email, username, password } = req.body;
+  const { email, username, password, role } = req.body;
 
-  //check user already exists
-  const userExists = await User.findOne({
-    $or: [{ email }, { username }],
+  const existedUser = await User.findOne({
+    $or: [{ username }, { email }],
   });
 
-  if (userExists) {
-    throw new ApiError(500, "User with email or username already exists", []);
+  if (existedUser) {
+    throw new ApiError(409, "User with email or username already exists", []);
   }
 
-  //create user entry in db
   const user = await User.create({
     email,
-    username,
     password,
+    username,
     isEmailVerified: false,
   });
 
@@ -52,29 +50,74 @@ const registerUser = asyncHandler(async (req, res) => {
   await user.save({ validateBeforeSave: false });
 
   await sendEmail({
-    email: user.email,
-    subject: "Verify your email",
-    mailgenConent: emailVerificationMailgenContent(
+    email: user?.email,
+    subject: "Please verify your email",
+    mailgenContent: emailVerificationMailgenContent(
       user.username,
-      `${req.protocol}://${req.get("host")}/api/v1/users/verify-email/${unHashedToken}`
+      `${req.protocol}://${req.get("host")}/api/v1/auth/verify-email/${unHashedToken}`
     ),
   });
 
-  const userCreated = await User.findById(user._id).select(
+  const createdUser = await User.findById(user._id).select(
     "-password -refreshToken -emailVerificationToken -emailVerificationExpiry"
   );
 
-  if (!userCreated) {
+  if (!createdUser) {
     throw new ApiError(500, "Something went wrong while registering a user");
   }
 
   return res
     .status(201)
     .json(
-      new ApiResponse(200),
-      { user: createdUser },
-      "User registered successfully and verification email has been sent on your email"
+      new ApiResponse(
+        200,
+        { user: createdUser },
+        "User registered successfully and verification email has been sent on your email"
+      )
     );
 });
 
-export { registerUser };
+const loginUser = asyncHandler(async (req, res) => {
+  const { email, username, password } = req.body;
+
+  const user = await User.findOne({
+    $or: [{ email }, { username }],
+  });
+
+  if (!user) {
+    throw new ApiError(500, "No such user please register first");
+  }
+
+  const isPasswordVerified = await user.isPasswordCorrect(password);
+
+  if (!isPasswordVerified) {
+    throw new ApiError(500, "Invalid password please try again");
+  }
+
+  const { accessToken, refreshToken } = await generateAccessAndRefreshToken(
+    user._id
+  );
+
+  const loggedInUser = await User.findById(user._id).select(
+    "-password -refreshToken -emailVerificationToken -emailVerificationExpiry"
+  );
+
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+
+  return res
+    .status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(
+      new ApiResponse(
+        200,
+        { user: loggedInUser, accessToken, refreshToken },
+        "User logges in successfully"
+      )
+    );
+});
+
+export { registerUser, loginUser };
